@@ -1,4 +1,5 @@
-import nodemailer from 'nodemailer';
+import * as nodemailer from 'nodemailer';
+
 
 export const sendPasswordByEmail = async (email: string, password: string): Promise<void> => {
   try {
