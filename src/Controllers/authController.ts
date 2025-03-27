@@ -2,12 +2,11 @@ import { Request, Response } from 'express';
 import { generatePassword, sendPasswordByEmail, verifyOTP, generateOTP, sendOTP } from '../Utils/emailServices';
 import User from '../Models/userModel';
 
-
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, phone } = req.body;
+    const { name, email } = req.body;
     const password = generatePassword();
-    const newUser = new User({ name, email, phone, password });
+    const newUser = new User({ name, email, password });
     await newUser.save();
     await sendPasswordByEmail(email, password);
     res.status(201).json({ message: 'User registration successful' });
@@ -27,21 +26,25 @@ const otpStore: { [key: string]: string } = {}; // Simple in-memory store for OT
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, phone, otp } = req.body;
-    const user = await User.findOne({ $or: [{ email }, { phone }] });
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      res.status(400).json({ message: 'Email and OTP are required' });
+      return;
+    }
+
+    const user = await User.findOne({ email });
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
 
-    const contact = email ? email : phone;
-    const storedOTP = otpStore[contact];
+    const storedOTP = otpStore[email];
     if (!storedOTP || otp !== storedOTP) {
       res.status(401).json({ message: 'Invalid OTP' });
       return;
     }
 
-    delete otpStore[contact]; // OTP is valid, remove it from store
+    delete otpStore[email]; // OTP is valid, remove it from store
     usersLoggedCount++;
     res.status(200).json({ message: 'Login successful', user });
   } catch (error) {
@@ -52,24 +55,22 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
 export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, phone } = req.body;
-
-    if (!email && !phone) {
-      res.status(400).json({ message: 'Email or Phone is required' });
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ message: 'Email is required' });
       return;
     }
 
-    const user = await User.findOne({ $or: [{ email }, { phone }] });
+    const user = await User.findOne({ email });
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
 
-    const contact = email ? email : phone;
     const otp = generateOTP();
-    otpStore[contact] = otp;
+    otpStore[email] = otp;
 
-    await sendOTP(contact, otp);
+    await sendOTP(email, otp);
     res.status(200).json({ message: 'OTP resent successfully' });
   } catch (error) {
     console.error('Resend OTP error:', error);
@@ -85,5 +86,3 @@ export const getLoggedInUsersCount = async (req: Request, res: Response): Promis
     res.status(500).json({ message: 'Failed to fetch users count' });
   }
 };
-
-

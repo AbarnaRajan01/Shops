@@ -13,4 +13,5 @@ router.post('/resendOtp',resendOTP)
 router.get('/count',getCategoryCounts)
 
 
+
 export default router;
